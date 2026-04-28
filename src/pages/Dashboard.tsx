@@ -42,13 +42,32 @@ export default function DashboardPage() {
           body: "{}",
         });
         if (!response.ok) {
-          throw new Error("Sign out request failed.");
+          const raw = await response.text().catch(() => "");
+          throw new Error(raw || "Sign out request failed.");
         }
         window.location.href = "/auth";
-      } catch {
-        // Last-resort: browser-level navigation to Better Auth route.
-        window.location.href = "/api/auth/sign-out?callbackURL=/auth";
-        setSignOutError(firstError instanceof Error ? firstError.message : "Sign out failed.");
+      } catch (secondError) {
+        // Last-resort: browser-level POST form submit to Better Auth route.
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "/api/auth/sign-out";
+
+        const callbackInput = document.createElement("input");
+        callbackInput.type = "hidden";
+        callbackInput.name = "callbackURL";
+        callbackInput.value = "/auth";
+        form.appendChild(callbackInput);
+
+        document.body.appendChild(form);
+        form.submit();
+
+        setSignOutError(
+          secondError instanceof Error
+            ? secondError.message
+            : firstError instanceof Error
+              ? firstError.message
+              : "Sign out failed."
+        );
       }
     } finally {
       setIsSigningOut(false);
