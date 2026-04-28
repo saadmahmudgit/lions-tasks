@@ -33,7 +33,7 @@ export default function DashboardPage() {
 
       window.location.href = "/auth";
     } catch (firstError) {
-      // Fallback request for environments where the client helper fails silently.
+      // Fallback request for environments where the client helper fails.
       try {
         const response = await fetch("/api/auth/sign-out", {
           method: "POST",
@@ -46,11 +46,9 @@ export default function DashboardPage() {
         }
         window.location.href = "/auth";
       } catch {
-        setSignOutError(
-          firstError instanceof Error
-            ? firstError.message
-            : "Could not sign out. Please refresh and try again."
-        );
+        // Last-resort: browser-level navigation to Better Auth route.
+        window.location.href = "/api/auth/sign-out?callbackURL=/auth";
+        setSignOutError(firstError instanceof Error ? firstError.message : "Sign out failed.");
       }
     } finally {
       setIsSigningOut(false);
