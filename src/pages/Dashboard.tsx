@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import Index from "@/pages/Index";
@@ -5,6 +6,8 @@ import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   const { data: session, isPending, error } = authClient.useSession();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   if (isPending) {
     return (
@@ -18,18 +21,53 @@ export default function DashboardPage() {
     return <Navigate to="/auth" replace />;
   }
 
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    setSignOutError(null);
+
+    try {
+      const { error: clientError } = await authClient.signOut();
+      if (clientError) {
+        throw new Error(clientError.message || "Sign out failed.");
+      }
+
+      window.location.href = "/auth";
+    } catch (firstError) {
+      // Fallback request for environments where the client helper fails silently.
+      try {
+        const response = await fetch("/api/auth/sign-out", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        if (!response.ok) {
+          throw new Error("Sign out request failed.");
+        }
+        window.location.href = "/auth";
+      } catch {
+        setSignOutError(
+          firstError instanceof Error
+            ? firstError.message
+            : "Could not sign out. Please refresh and try again."
+        );
+      }
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
   return (
     <div className="relative">
       <div className="absolute right-4 top-4 z-20">
         <Button
           variant="outline"
-          onClick={async () => {
-            await authClient.signOut();
-            window.location.href = "/auth";
-          }}
+          disabled={isSigningOut}
+          onClick={handleSignOut}
         >
-          Sign out
+          {isSigningOut ? "Signing out..." : "Sign out"}
         </Button>
+        {signOutError && <p className="mt-2 text-right text-xs text-destructive">{signOutError}</p>}
       </div>
       <Index />
     </div>
