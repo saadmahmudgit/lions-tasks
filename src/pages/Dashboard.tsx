@@ -4,6 +4,33 @@ import { authClient } from "@/lib/auth-client";
 import Index from "@/pages/Index";
 import { Button } from "@/components/ui/button";
 
+function clearBrowserSession() {
+  // Expire all cookies for current host as a hard fallback.
+  const cookies = document.cookie ? document.cookie.split(";") : [];
+  for (const cookie of cookies) {
+    const eq = cookie.indexOf("=");
+    const name = (eq > -1 ? cookie.slice(0, eq) : cookie).trim();
+    if (!name) continue;
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}`;
+  }
+
+  // Remove local/session storage entries that may cache auth state.
+  const lsKeys = Object.keys(localStorage);
+  for (const key of lsKeys) {
+    if (key.toLowerCase().includes("auth") || key.toLowerCase().includes("session")) {
+      localStorage.removeItem(key);
+    }
+  }
+
+  const ssKeys = Object.keys(sessionStorage);
+  for (const key of ssKeys) {
+    if (key.toLowerCase().includes("auth") || key.toLowerCase().includes("session")) {
+      sessionStorage.removeItem(key);
+    }
+  }
+}
+
 export default function DashboardPage() {
   const { data: session, isPending, error } = authClient.useSession();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -47,19 +74,9 @@ export default function DashboardPage() {
         }
         window.location.href = "/auth";
       } catch (secondError) {
-        // Last-resort: browser-level POST form submit to Better Auth route.
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = "/api/auth/sign-out";
-
-        const callbackInput = document.createElement("input");
-        callbackInput.type = "hidden";
-        callbackInput.name = "callbackURL";
-        callbackInput.value = "/auth";
-        form.appendChild(callbackInput);
-
-        document.body.appendChild(form);
-        form.submit();
+        // Last-resort: force local browser logout even if API route is unavailable.
+        clearBrowserSession();
+        window.location.href = "/auth";
 
         setSignOutError(
           secondError instanceof Error
